@@ -6,6 +6,12 @@ InSitu is a personal vocabulary learning tool for non-native English speakers. P
 
 Everything runs locally. No account, no cloud database, no tracking.
 
+## Demo
+
+Watch a quick walkthrough of the app in action:
+
+[![InSitu Demo](https://img.youtube.com/vi/6mtRDNZJmek/0.jpg)](https://youtu.be/6mtRDNZJmek)
+
 ## How It Works
 
 1. **Paste text** from any document, or **upload a photo** of a physical document (OCR extracts the text)
