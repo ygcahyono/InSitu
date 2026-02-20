@@ -1,0 +1,6 @@
+streamlit
+anthropic
+pytesseract
+Pillow
+python-dotenv
+streamlit-js-eval
