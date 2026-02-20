@@ -117,16 +117,16 @@ def render_word_card(word: str, result: dict):
     st.markdown(f'<div class="definition-text">{result["definition"]}</div>', 
                 unsafe_allow_html=True)
     
-    # Examples
-    st.markdown("**Examples:**")
-    for i, example in enumerate(result["examples"], 1):
-        st.markdown(f'<div class="example-item">{i}. {example}</div>', 
-                    unsafe_allow_html=True)
-    
     # Source context
     if result.get("source_context"):
         st.markdown("**From your text:**")
         st.markdown(f'<div class="source-context">"{result["source_context"]}"</div>', 
+                    unsafe_allow_html=True)
+    
+    # Examples
+    st.markdown("**Examples:**")
+    for i, example in enumerate(result["examples"], 1):
+        st.markdown(f'<div class="example-item">{i}. {example}</div>', 
                     unsafe_allow_html=True)
     
     # Refresh examples button only (Save is automatic now)
