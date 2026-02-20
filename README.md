@@ -1,131 +1,67 @@
 # InSitu
 
-**Learn from the words you encounter in real life**
+**Learn vocabulary from the documents you actually read.**
 
-InSitu is a personal English vocabulary learning tool that helps non-native English speakers learn words from documents they encounter in daily life - letters, emails, notices, and more.
+InSitu is a personal vocabulary learning tool for non-native English speakers. Paste text from a real document — a lease, a bank letter, a work email — look up words you don't know, and get AI-powered definitions in the context you found them. Every word is saved to a personal vocab bank for future review.
 
-## Features
+Everything runs locally. No account, no cloud database, no tracking.
 
-- **Text Upload**: Paste text from any document you're reading
-- **Image OCR**: Upload images of documents and automatically extract text
-- **AI-Powered Definitions**: Get clear, friendly explanations with UK/London context examples
-- **Vocab Bank**: Save words for later review with spaced repetition tracking
+## How It Works
 
-## Prerequisites
+1. **Paste text** from any document, or **upload a photo** of a physical document (OCR extracts the text)
+2. **Type a word** you want to understand and click Look Up
+3. Get a **plain-language definition**, the **sentence from your text** where it appeared, and **example sentences**
+4. The word is **automatically saved** to your vocab bank
 
-### Python
+## Tech Stack
 
-- Python 3.10 or higher
-
-### Tesseract OCR (for image text extraction)
-
-**macOS (using Homebrew):**
-```bash
-brew install tesseract
-```
-
-To verify installation:
-```bash
-tesseract --version
-```
-
-### Anthropic API Key
-
-You'll need an API key from [Anthropic](https://console.anthropic.com/) to use the AI features.
+- **Streamlit** — web UI
+- **Claude AI** (Anthropic) — contextual word definitions and examples
+- **SQLite** — local vocab bank storage
+- **Tesseract OCR** — text extraction from images
 
 ## Setup
 
-### 1. Clone the repository
+### Prerequisites
+
+- Python 3.10+
+- [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) (`brew install tesseract` on macOS)
+- [Anthropic API key](https://console.anthropic.com/)
+
+### Install and run
 
 ```bash
-git clone <your-repo-url>
-cd insitu
-```
-
-### 2. Create a virtual environment
-
-```bash
+git clone https://github.com/ygcahyono/InSitu.git
+cd InSitu
 python -m venv venv
-source venv/bin/activate  # On macOS/Linux
-```
-
-### 3. Install dependencies
-
-```bash
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 4. Configure your API key
-
-Copy the example environment file and add your API key:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` and replace `your_api_key_here` with your actual Anthropic API key:
+Create a `.env` file with your API key:
 
 ```
-ANTHROPIC_API_KEY=sk-ant-api03-xxxxx
+ANTHROPIC_API_KEY=your-key-here
 ```
 
-### 5. Run the app
+Run the app:
 
 ```bash
 streamlit run app.py
 ```
 
-The app will open in your browser at `http://localhost:8501`
-
-## Usage
-
-### Learning Words
-
-1. Navigate to **📖 Learn** in the sidebar
-2. Either:
-   - **Paste text** from a document into the text area, or
-   - **Upload an image** (JPG/PNG) of a document
-3. Click Submit/Extract to load the text
-4. Type any word you want to understand in the lookup field
-5. Review the definition and UK-context examples
-6. Click **💾 Save Word** to add it to your vocab bank
-7. Click **🔄 Refresh Examples** to get different example sentences
-
-### Vocab Bank
-
-1. Navigate to **📚 Vocab Bank** in the sidebar
-2. View all your saved words with definitions
-3. Use the search box to filter words
-4. Click the expand arrow to see full details
-5. Use the 🗑️ button to delete words you no longer need
-
-## Deploying to Streamlit Cloud
-
-1. Push your code to a GitHub repository
-2. Go to [share.streamlit.io](https://share.streamlit.io)
-3. Click "New app" and connect your GitHub repository
-4. Select `app.py` as the main file
-5. Add your `ANTHROPIC_API_KEY` in the "Secrets" section:
-   ```
-   ANTHROPIC_API_KEY = "your-api-key-here"
-   ```
-6. Click "Deploy"
-
-**Note**: The SQLite database won't persist on Streamlit Cloud's ephemeral filesystem. For production use, consider migrating to a cloud database.
+Opens at `http://localhost:8501`.
 
 ## Project Structure
 
 ```
-insitu/
+InSitu/
 ├── app.py              # Main Streamlit application
-├── database.py         # SQLite database operations
 ├── ai_helper.py        # Claude API integration
+├── database.py         # SQLite database operations
 ├── ocr_helper.py       # Image text extraction (OCR)
 ├── requirements.txt    # Python dependencies
-├── .env.example        # Environment template
-├── .env                # Your API key (not committed)
-├── vocab.db            # SQLite database (created on first run)
-└── README.md           # This file
+└── .env.example        # Environment template
 ```
 
 ## License
