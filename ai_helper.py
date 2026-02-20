@@ -26,9 +26,38 @@ def get_client() -> Anthropic:
     return client
 
 
+def strip_markdown(text: str) -> str:
+    """Remove common markdown formatting from text to produce plain text."""
+    if not text:
+        return text
+    # Remove heading markers (# ## ### etc. at start of lines)
+    text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
+    # Remove bold+italic markers (***text***)
+    text = re.sub(r'\*{3}(.+?)\*{3}', r'\1', text)
+    # Remove bold markers (**text**)
+    text = re.sub(r'\*{2}(.+?)\*{2}', r'\1', text)
+    # Remove bold markers (__text__)
+    text = re.sub(r'__(.+?)__', r'\1', text)
+    # Remove italic markers (*text*)
+    text = re.sub(r'\*(.+?)\*', r'\1', text)
+    # Remove italic markers (_text_) but not underscores within words
+    text = re.sub(r'(?<!\w)_(.+?)_(?!\w)', r'\1', text)
+    # Remove inline code backticks
+    text = re.sub(r'`(.+?)`', r'\1', text)
+    # Remove code block fences
+    text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
+    # Normalize double-double quotes to single double quotes
+    text = text.replace('""', '"')
+    # Clean up excess whitespace
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
+
+
 SYSTEM_PROMPT = """You are a friendly English tutor helping a non-native English speaker living in London. 
 Explain words clearly and give examples rooted in everyday London/UK life contexts 
 (transport, work, weather, food, bureaucracy). Keep explanations concise but warm.
+
+IMPORTANT: Do NOT use any markdown formatting in your response. No bold markers (**), no italic markers (*), no headings (#), no code blocks or backticks (`). Write everything in plain text only. Use standard quotation marks normally (single pair of double quotes, not double-double quotes).
 
 When explaining a word, always respond in this exact format:
 
@@ -93,6 +122,12 @@ def parse_response(response_text: str) -> dict:
         source_text = source_match.group(1).strip()
         if source_text and "not found" not in source_text.lower():
             result["source_context"] = source_text
+    
+    # Strip any residual markdown formatting from all fields
+    result["definition"] = strip_markdown(result["definition"])
+    result["examples"] = [strip_markdown(ex) for ex in result["examples"]]
+    if result["source_context"]:
+        result["source_context"] = strip_markdown(result["source_context"])
     
     return result
 
@@ -174,6 +209,7 @@ def refresh_examples(word: str, current_definition: str) -> tuple[bool, list | s
         user_message = f"""The word is "{word}" and its definition is: {current_definition}
 
 Please generate 3 NEW and DIFFERENT example sentences using this word in everyday UK/London contexts.
+Do NOT use any markdown formatting - write in plain text only, no bold (**), no italic (*), no headings (#).
 Format your response as:
 1. [First example]
 2. [Second example]
@@ -190,7 +226,7 @@ Make these examples different from typical textbook examples - use real London l
         response = anthropic_client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=512,
-            system="You are a helpful English tutor specializing in UK/London contexts. Generate practical, relatable example sentences.",
+            system="You are a helpful English tutor specializing in UK/London contexts. Generate practical, relatable example sentences. Do NOT use any markdown formatting - write in plain text only.",
             messages=[
                 {"role": "user", "content": user_message}
             ]
@@ -200,11 +236,11 @@ Make these examples different from typical textbook examples - use real London l
         
         # Parse numbered examples
         examples = re.findall(r'\d+\.\s*(.+?)(?=\n\d+\.|$)', response_text, re.DOTALL)
-        examples = [ex.strip() for ex in examples if ex.strip()]
+        examples = [strip_markdown(ex.strip()) for ex in examples if ex.strip()]
         
         if not examples:
             # Fallback: split by newlines
-            examples = [line.strip() for line in response_text.split('\n') 
+            examples = [strip_markdown(line.strip()) for line in response_text.split('\n') 
                        if line.strip() and len(line) > 20][:3]
         
         if examples:

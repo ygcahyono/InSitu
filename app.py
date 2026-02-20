@@ -4,9 +4,8 @@ Main Streamlit application.
 """
 
 import streamlit as st
-from streamlit_js_eval import streamlit_js_eval
 from database import init_db, save_word, get_all_words, search_words, delete_word, get_word_count
-from ai_helper import get_word_explanation, refresh_examples, check_api_key
+from ai_helper import get_word_explanation, refresh_examples, check_api_key, strip_markdown
 from ocr_helper import extract_text_from_image
 
 # Page configuration
@@ -17,11 +16,12 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for minimal styling
+# Custom CSS — uses rgba() semi-transparent backgrounds that adapt
+# automatically to both light and dark Streamlit themes.
 st.markdown("""
 <style>
     .word-card {
-        background-color: #f8f9fa;
+        background: rgba(76, 175, 80, 0.08);
         border-radius: 10px;
         padding: 20px;
         margin: 10px 0;
@@ -29,51 +29,40 @@ st.markdown("""
     }
     .definition-text {
         font-size: 1.1em;
-        color: #333;
+        line-height: 1.6;
         margin-bottom: 15px;
     }
     .example-item {
-        background-color: #fff;
+        background: rgba(33, 150, 243, 0.08);
         padding: 10px 15px;
         margin: 5px 0;
         border-radius: 5px;
         border-left: 3px solid #2196F3;
-        color: #333;
     }
     .source-context {
-        background-color: #fff3cd;
+        background: rgba(255, 193, 7, 0.1);
         padding: 10px 15px;
         border-radius: 5px;
         font-style: italic;
         margin-top: 10px;
-        color: #856404;
+        border-left: 3px solid #ffc107;
     }
     .text-display {
-        background-color: #f5f5f5;
+        background: rgba(128, 128, 128, 0.1);
         padding: 20px;
         border-radius: 10px;
         max-height: 300px;
         overflow-y: auto;
-        color: #333;
         line-height: 1.8;
         font-size: 1.05em;
         user-select: text;
         cursor: text;
     }
     .stats-box {
-        background-color: #e3f2fd;
+        background: rgba(33, 150, 243, 0.08);
         padding: 15px;
         border-radius: 8px;
         text-align: center;
-        color: #333;
-    }
-    .selection-hint {
-        background-color: #e8f5e9;
-        padding: 10px 15px;
-        border-radius: 5px;
-        color: #2e7d32;
-        font-size: 0.9em;
-        margin: 10px 0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -90,10 +79,6 @@ if "word_result" not in st.session_state:
     st.session_state.word_result = None
 if "page" not in st.session_state:
     st.session_state.page = "learn"
-if "lookup_triggered" not in st.session_state:
-    st.session_state.lookup_triggered = False
-if "lookup_counter" not in st.session_state:
-    st.session_state.lookup_counter = 0
 
 
 def render_sidebar():
@@ -215,38 +200,7 @@ def render_learn_page():
         )
         
         # Hint for user
-        st.markdown(
-            '<div class="selection-hint">💡 <strong>Tip:</strong> Highlight any word above, then click "Look Up Selected Word" below</div>',
-            unsafe_allow_html=True
-        )
-        
-        # Track text selection via JavaScript.
-        # A mouseup listener on the parent document stores the selected text
-        # in parent.window._insituSelectedText, which persists across Streamlit
-        # reruns (DOM rebuilds don't affect the window object).
-        streamlit_js_eval(
-            js_expressions="""
-            (function() {
-                try {
-                    var pd = parent.document;
-                    var pw = parent.window;
-                    if (!pw._insituListenerAdded) {
-                        pd.addEventListener('mouseup', function() {
-                            try {
-                                var s = pd.getSelection().toString().trim();
-                                if (s.length > 0) {
-                                    pw._insituSelectedText = s;
-                                }
-                            } catch(e) {}
-                        });
-                        pw._insituListenerAdded = true;
-                    }
-                } catch(e) {}
-                return 'ready';
-            })()
-            """,
-            key="selection_setup"
-        )
+        st.caption("Type any word from the text above to look it up.")
         
         # Button row
         col1, col2 = st.columns([1, 3])
@@ -261,74 +215,14 @@ def render_learn_page():
         st.markdown("---")
         st.markdown("### Look Up a Word")
         
-        # Look Up Selected Word button - captures browser selection
-        if st.button("🔍 Look Up Selected Word", key="lookup_selected_btn", type="primary"):
-            st.session_state.lookup_counter += 1
-            st.session_state.lookup_triggered = True
-            st.rerun()
-        
-        # Get selected text from browser if lookup was triggered.
-        # Uses a dynamic key so each click creates a fresh streamlit_js_eval
-        # component, avoiding stale cached values.
-        if st.session_state.lookup_triggered:
-            selected_text = streamlit_js_eval(
-                js_expressions="(function() { try { return parent.window._insituSelectedText || ''; } catch(e) { return ''; } })()",
-                key=f"get_selection_{st.session_state.lookup_counter}"
-            )
-            
-            if selected_text is not None and len(selected_text.strip()) > 0:
-                # Clean the selected word (take first word if multiple selected)
-                word = selected_text.strip().split()[0].lower()
-                # Remove punctuation from start/end
-                word = word.strip('.,!?;:"\'-()[]{}')
-                
-                if word:
-                    st.session_state.lookup_triggered = False
-                    st.session_state.current_word = word
-                    
-                    with st.spinner(f"Looking up '{word}'..."):
-                        success, result = get_word_explanation(
-                            word,
-                            st.session_state.uploaded_text
-                        )
-                        
-                        if success:
-                            st.session_state.word_result = result
-                            
-                            # Auto-save to vocab bank
-                            save_success, save_msg = save_word(
-                                word=word,
-                                definition=result["definition"],
-                                source_context=result.get("source_context")
-                            )
-                            if save_success:
-                                st.toast(f"✅ '{word}' saved to your vocab bank!")
-                            else:
-                                st.toast(f"ℹ️ {save_msg}")
-                            st.rerun()
-                        else:
-                            st.error(result)
-                            st.session_state.word_result = None
-                else:
-                    st.session_state.lookup_triggered = False
-                    st.warning("Please highlight a word in the text above first, then click the button.")
-            elif selected_text is not None:
-                # JS executed but no selection was stored
-                st.session_state.lookup_triggered = False
-                st.warning("Please highlight a word in the text above first, then click the button.")
-            # else: selected_text is None means JS hasn't returned yet, wait for next render
-        
-        st.markdown("---")
-        st.caption("Or type a word manually:")
-        
         word_input = st.text_input(
             "Type a word you want to understand",
-            placeholder="Enter a word...",
+            placeholder="Enter a word from the text...",
             key="word_lookup",
             label_visibility="collapsed"
         )
         
-        if st.button("🔍 Look Up", key="lookup_btn"):
+        if st.button("🔍 Look Up", key="lookup_btn", type="primary"):
             if word_input.strip():
                 word = word_input.strip().lower()
                 st.session_state.current_word = word
@@ -401,8 +295,8 @@ def render_vocab_bank_page():
                 st.markdown(f"**{word_data['word'].capitalize()}**")
             
             with col2:
-                # Truncate definition
-                definition = word_data['definition'] or ""
+                # Truncate definition (strip markdown for clean display)
+                definition = strip_markdown(word_data['definition'] or "")
                 truncated = definition[:80] + "..." if len(definition) > 80 else definition
                 st.markdown(truncated)
             
@@ -439,9 +333,11 @@ def render_vocab_bank_page():
     
     for word_data in words:
         with st.expander(f"📝 {word_data['word'].capitalize()}"):
-            st.markdown(f"**Definition:** {word_data['definition']}")
+            clean_def = strip_markdown(word_data['definition'] or "")
+            st.markdown(f"**Definition:** {clean_def}")
             if word_data.get('source_context'):
-                st.markdown(f"**Original context:** _{word_data['source_context']}_")
+                clean_ctx = strip_markdown(word_data['source_context'])
+                st.markdown(f"**Original context:** {clean_ctx}")
             st.caption(f"Status: {word_data['status']} | Reviews: {word_data['review_count']} | Next review: {word_data['next_review_date']}")
 
 
