@@ -4,3 +4,5 @@ pytesseract
 Pillow
 python-dotenv
 streamlit-js-eval
+openai-whisper
+moviepy

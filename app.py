@@ -7,6 +7,7 @@ import streamlit as st
 from database import init_db, save_word, get_all_words, search_words, delete_word, get_word_count
 from ai_helper import get_word_explanation, refresh_examples, check_api_key, strip_markdown
 from ocr_helper import extract_text_from_image
+from video_helper import extract_subtitles_from_video
 
 # Page configuration
 st.set_page_config(
@@ -63,6 +64,14 @@ st.markdown("""
         padding: 15px;
         border-radius: 8px;
         text-align: center;
+    }
+    /* Tab styling for input method selector */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        padding: 10px 20px;
+        font-size: 1em;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -153,34 +162,58 @@ def render_learn_page():
     
     st.markdown("Upload text from documents you encounter in daily life, then look up words you want to understand.")
     
-    # Input section - two columns
-    col1, col2 = st.columns(2)
+    # Input section - horizontal tabs
+    tab_text, tab_image, tab_video = st.tabs([
+        "📝 Paste Text",
+        "🖼️ Upload Image",
+        "🎬 Upload Video",
+    ])
     
-    with col1:
-        st.markdown("**Option A: Paste Text**")
+    with tab_text:
+        st.markdown("")
         text_input = st.text_area(
             "Paste text from a letter, email, or document",
             height=200,
             placeholder="Paste your text here...",
             key="text_paste"
         )
-        if st.button("Submit Text", key="submit_text"):
+        if st.button("Submit Text", key="submit_text", type="primary"):
             if text_input.strip():
                 st.session_state.uploaded_text = text_input.strip()
                 st.session_state.word_result = None
                 st.rerun()
     
-    with col2:
-        st.markdown("**Option B: Upload Image**")
-        uploaded_file = st.file_uploader(
-            "Upload an image (JPG, PNG)",
+    with tab_image:
+        st.markdown("")
+        uploaded_image = st.file_uploader(
+            "Upload an image of a document, letter, or article",
             type=["jpg", "jpeg", "png"],
             key="image_upload"
         )
-        if uploaded_file is not None:
-            if st.button("Extract Text", key="extract_text"):
+        if uploaded_image is not None:
+            st.image(uploaded_image, caption="Uploaded image", use_container_width=True)
+            if st.button("Extract Text from Image", key="extract_text", type="primary"):
                 with st.spinner("Extracting text from image..."):
-                    success, result = extract_text_from_image(uploaded_file)
+                    success, result = extract_text_from_image(uploaded_image)
+                    if success:
+                        st.session_state.uploaded_text = result
+                        st.session_state.word_result = None
+                        st.rerun()
+                    else:
+                        st.error(result)
+    
+    with tab_video:
+        st.markdown("")
+        uploaded_video = st.file_uploader(
+            "Upload a video of a speech, lecture, or conversation",
+            type=["mp4", "mov", "avi", "mkv", "webm"],
+            key="video_upload"
+        )
+        if uploaded_video is not None:
+            st.video(uploaded_video)
+            if st.button("Extract Subtitles", key="extract_subtitles", type="primary"):
+                with st.spinner("Extracting audio and transcribing speech... This may take a few minutes depending on video length."):
+                    success, result = extract_subtitles_from_video(uploaded_video)
                     if success:
                         st.session_state.uploaded_text = result
                         st.session_state.word_result = None
@@ -202,14 +235,11 @@ def render_learn_page():
         # Hint for user
         st.caption("Type any word from the text above to look it up.")
         
-        # Button row
-        col1, col2 = st.columns([1, 3])
-        
-        with col1:
-            if st.button("🗑️ Clear Text", key="clear_text"):
-                st.session_state.uploaded_text = ""
-                st.session_state.word_result = None
-                st.rerun()
+        # Clear button
+        if st.button("🗑️ Clear Text", key="clear_text"):
+            st.session_state.uploaded_text = ""
+            st.session_state.word_result = None
+            st.rerun()
         
         # Word lookup section
         st.markdown("---")
